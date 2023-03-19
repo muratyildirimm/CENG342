@@ -18,7 +18,7 @@ int main(int argc, char *argv[]) {
      srand(time(NULL));
 
      // Allocate
-     double **matrix = (double **)malloc(rows * sizeof(double *));
+     double *matrix = (double *)malloc(rows * sizeof(double *));
      for (i = 0; i < rows; i++) {
          matrix[i] = (double *)calloc(cols, sizeof(double));
          for (j = 0; j < cols; j++) {
