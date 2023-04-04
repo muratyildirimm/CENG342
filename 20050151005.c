@@ -1,61 +1,105 @@
+
+// Murat Duran Yıldırım 20050151005
+
 #include <stdio.h>
 #include <stdlib.h>
-#include <time.h>
-#include "hellomake.h"
+#include <mpi.h>
 
-int i = 0;
-int j = 0;
 
-int main(int argc, char *argv[]) {
-     if (argc != 4) {
-         printf("%s <rows> <cols> <output_filename>\n", argv[0]);
-         return 1;
+void multiply(double **matrix,double *vector,double *output,int r,int c,int rank,int size){
+
+    double *partial_output = (double *)malloc(r/size * sizeof(double));
+    int i, j, first, end;
+
+    first = rank * r/size;
+    end = (rank + 1) * r/size;
+   double start = MPI_Wtime();
+    for(i = first; i<end; i++){
+        double sum = 0.0;
+        for(j=0; j<c; j++){
+            sum += matrix[i][j]*vector[j];
+        }
+        partial_output[i-first] = sum;
+    }
+
+    MPI_Allgather(partial_output, r/size, MPI_DOUBLE, output, r/size, MPI_DOUBLE, MPI_COMM_WORLD);
+ 
+     if(rank == 0){
+        double end = MPI_Wtime();
+        printf("\nElapsed time is %f seconds for parallel mxv with %d processes\n", end - start, size);
      }
-     int rows = atoi(argv[1]);
-     int cols = atoi(argv[2]);
-     char *output_filename = argv[3];
+    free(partial_output);
+}
 
-     srand(time(NULL));
+int main(int argc, char* argv[]) {
 
-     // Allocate
-     double *matrix = (double *)malloc(rows * sizeof(double *));
-     for (i = 0; i < rows; i++) {
-         matrix[i] = (double *)calloc(cols, sizeof(double));
-         for (j = 0; j < cols; j++) {
+    int r=atoi(argv[1]);
+    int c=atoi(argv[2]);
 
-             matrix[i][j] = ((double)rand() / RAND_MAX) * 99.0 + 1.0;
-         }
-     }
+    double** matrix;
+    double* output;
+    double* vector;
+    int i , j, rank, size;
 
-     // Allocate 2
-     double *vector = (double *)calloc(cols, sizeof(double));
-     for (i = 0; i < cols; i++) {
-     // Random number
-         vector[i] = ((double)rand() / RAND_MAX) * 99.0 + 1.0;
-     }
+    MPI_Init(&argc, &argv);
+    MPI_Comm_rank(MPI_COMM_WORLD,&rank);
+    MPI_Comm_size(MPI_COMM_WORLD, &size);
 
-     // Matrix multiplication
-     double *result = (double *)calloc(rows, sizeof(double));
-     for (i = 0; i < rows; i++) {
-         for (j = 0; j < cols; j++) {
-             result[i] += matrix[i][j] * vector[j];
-             }
-     }
+    matrix = (double**)malloc(r * sizeof(double*));
+    for(i = 0; i < r; i++)
+        matrix[i] = (double*)malloc(c * sizeof(double));
 
-     // Write to file
-     FILE *output_file = fopen(output_filename, "w");
-     for (i = 0; i < rows; i++) {
-         fprintf(output_file, "%.2f\n", result[i]);
-     }
-     fclose(output_file);
+    vector = (double *)malloc(c * sizeof(double));
+    output = (double *)malloc(r * sizeof(double));
 
-     // Clear memory
-     for (i = 0; i < rows; i++) {
-         free(matrix[i]);
-     }
-     free(matrix);
-     free(vector);
-     free(result);
+    //seed random number of my id
+    srand48(20050151005);
+    
+     for(j = 0; j<c; j++){
+        // vector random
+        vector[j] = ((double)rand() / RAND_MAX) * 20.0 + 1.0;;
+    }
 
-     return 0;
- }
+    for(i = 0; i<r; i++){
+        for(j = 0; j<c; j++){
+            // matrix random
+            matrix[i][j]  = ((double)rand() / RAND_MAX) * 99.0 + 1.0;;
+        }
+    }
+
+   // multiply matrix and vector
+
+    multiply(matrix,vector,output,r,c,rank,size);
+    MPI_Barrier(MPI_COMM_WORLD);
+    
+     if(rank == 0){
+   
+    FILE *file; 
+
+    file = fopen(argv[3], "w");
+
+           
+    if (file == NULL) {
+        printf("CANNOT OPEN.\n");
+        return 1;
+    }
+    
+    int k;
+    fprintf(file, "%s\n", "output");
+    for(k = 0; k<r ;k++){
+    	// Write output 
+    	fprintf(file, "%.2lf\n", output[k]);
+}
+  
+    fclose(file);
+}
+
+    free(matrix);
+    free(vector);
+    free(output);
+
+    MPI_Finalize();
+
+    return 0;
+}
+
